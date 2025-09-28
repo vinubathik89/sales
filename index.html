@@ -8,6 +8,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
@@ -22,7 +25,7 @@
         .btn-secondary:hover { background-color: #d1d5db; }
         .page { display: none; }
         .page.active { display: block; }
-        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; overflow-y: auto; padding: 1rem 0; }
         .modal-content { background: white; padding: 2rem; border-radius: 1rem; width: 90%; max-width: 500px; }
     </style>
 </head>
@@ -39,39 +42,34 @@
     <div id="admin-panel" class="page max-w-7xl mx-auto">
         <header class="mb-8 flex justify-between items-center"><h1 class="text-4xl font-bold text-gray-800">Admin Panel</h1><button id="admin-logout-btn" class="btn-secondary"><span class="material-icons">logout</span>Logout</button></header>
         <div class="flex justify-center mb-8 bg-gray-200 rounded-lg p-2 space-x-2"><button class="tab-button flex-1 py-2 px-4 rounded-md font-semibold active" onclick="showTab('stock')"><span class="material-icons align-middle mr-2">inventory_2</span>Stock</button><button class="tab-button flex-1 py-2 px-4 rounded-md font-semibold" onclick="showTab('sales')"><span class="material-icons align-middle mr-2">point_of_sale</span>Sales</button><button class="tab-button flex-1 py-2 px-4 rounded-md font-semibold" onclick="showTab('reports')"><span class="material-icons align-middle mr-2">assessment</span>Reports</button></div>
-        <div id="stock" class="tab-content" style="display: block;"><div class="grid grid-cols-1 md:grid-cols-3 gap-8"><div class="md:col-span-1"><div class="card p-6"><h2 class="text-2xl font-bold mb-4 text-gray-700">Add New Item</h2><form id="add-stock-form" class="space-y-4"><div><label class="block text-sm font-medium text-gray-600 mb-1">Item ID</label><div class="flex items-center space-x-2"><input type="text" id="itemId" class="form-input" placeholder="භාණ්ඩ අංකය (හිස්ව තබන්න)" required><button type="button" id="open-stock-scanner" class="p-2 bg-gray-200 rounded-md hover:bg-gray-300"><span class="material-icons">qr_code_scanner</span></button></div></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Price (LKR)</label><input type="number" id="itemPrice" class="form-input" placeholder="විකුණුම් මිල" required></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Cost (LKR)</label><input type="number" id="itemCost" class="form-input" placeholder="මිලදී ගත් මිල" required></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Supplier</label><input type="text" id="itemSupplier" class="form-input" placeholder="සැපයුම්කරු" required></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Picture</label><div class="flex items-center gap-2"><input type="file" id="itemPicture" class="form-input file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept="image/*"><button type="button" id="open-camera-btn" class="p-2 bg-gray-200 rounded-md hover:bg-gray-300"><span class="material-icons">photo_camera</span></button></div><img id="image-preview" class="hidden mt-2 rounded-md max-h-32"/></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Points (Optional)</label><input type="number" id="itemPoints" class="form-input" placeholder="උදා: 10"></div><button type="submit" class="btn-primary w-full"><span class="material-icons">add_shopping_cart</span>Add Item</button></form></div></div><div class="md:col-span-2"><div class="card p-6"><h2 class="text-2xl font-bold mb-4 text-gray-700">Current Stock</h2><div id="stock-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"><p class="text-gray-500 col-span-full">Loading stock...</p></div></div></div></div></div>
+        <div id="stock" class="tab-content" style="display: block;"><div class="grid grid-cols-1 md:grid-cols-3 gap-8"><div class="md:col-span-1"><div class="card p-6"><h2 class="text-2xl font-bold mb-4 text-gray-700">Add New Item</h2><form id="add-stock-form" class="space-y-4"><div><label class="block text-sm font-medium text-gray-600 mb-1">Item ID</label><div class="flex items-center space-x-2"><input type="text" id="itemId" class="form-input" placeholder="භාණ්ඩ අංකය (හිස්ව තබන්න)"><button type="button" id="open-stock-scanner" class="p-2 bg-gray-200 rounded-md hover:bg-gray-300"><span class="material-icons">qr_code_scanner</span></button></div></div><div><label for="itemCategory" class="block text-sm font-medium text-gray-600 mb-1">වර්ගය</label><select id="itemCategory" class="form-input"></select></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Price (LKR)</label><input type="number" id="itemPrice" class="form-input" placeholder="විකුණුම් මිල" required></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Cost (LKR)</label><input type="number" id="itemCost" class="form-input" placeholder="මිලදී ගත් මිල" required></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Supplier</label><input type="text" id="itemSupplier" class="form-input" placeholder="සැපයුම්කරු" required></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Picture</label><div class="flex items-center gap-2"><input type="file" id="itemPicture" class="form-input file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept="image/*"><button type="button" id="open-camera-btn" class="p-2 bg-gray-200 rounded-md hover:bg-gray-300"><span class="material-icons">photo_camera</span></button></div><img id="image-preview" class="hidden mt-2 rounded-md max-h-32"/></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Points (Optional)</label><input type="number" id="itemPoints" class="form-input" placeholder="උදා: 10"></div><button type="submit" class="btn-primary w-full"><span class="material-icons">add_shopping_cart</span>Add Item</button></form></div></div><div class="md:col-span-2"><div class="card p-6"><h2 class="text-2xl font-bold mb-4 text-gray-700">Current Stock</h2><div id="stock-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"><p class="text-gray-500 col-span-full">Loading stock...</p></div></div></div></div></div>
         <div id="sales" class="tab-content"><div class="grid grid-cols-1 md:grid-cols-3 gap-8"><div class="md-col-span-1"><div class="card p-6"><h2 class="text-2xl font-bold mb-4 text-gray-700">New Sale</h2><form id="add-sale-form" class="space-y-4"><div><label class="block text-sm font-medium text-gray-600 mb-1">Item ID</label><div class="flex items-center space-x-2"><input type="text" id="saleItemId" class="form-input" placeholder="භාණ්ඩ අංකය" required><button type="button" id="open-sale-scanner" class="p-2 bg-gray-200 rounded-md hover:bg-gray-300"><span class="material-icons">qr_code_scanner</span></button></div></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Customer Name</label><input type="text" id="customerName" class="form-input" placeholder="ගනුදෙනුකරුගේ නම" required></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Contact Number</label><input type="text" id="customerContact" class="form-input" placeholder="දුරකථන අංකය" required></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Payment Type</label><div class="flex space-x-4"><label class="flex items-center"><input type="radio" name="paymentType" value="full" class="mr-2" checked> Full Cash</label><label class="flex items-center"><input type="radio" name="paymentType" value="installment" class="mr-2"> Installment</label></div></div><div id="downpayment-section" class="hidden"><label class="block text-sm font-medium text-gray-600 mb-1">Downpayment (LKR)</label><input type="number" id="downpaymentAmount" class="form-input" placeholder="මූලික ගෙවීම"></div><button type="submit" class="btn-primary w-full"><span class="material-icons">shopping_cart</span>Create Sale</button></form></div></div><div class="md:col-span-2"><div class="card p-6"><h2 class="text-2xl font-bold mb-4 text-gray-700">Ongoing Sales</h2><div class="mb-4"><input type="text" id="sales-search" class="form-input" placeholder="නම, දුරකථන අංකය හෝ ID මගින් සොයන්න..."></div><div id="sales-list" class="space-y-4"><p class="text-gray-500">Loading sales...</p></div></div></div></div></div>
-        <div id="reports" class="tab-content"><div class="card p-6"><h2 class="text-2xl font-bold mb-4 text-gray-700">Sales Reports</h2><div class="flex flex-wrap gap-4 mb-6"><button id="report-daily" class="btn-secondary">Daily Report</button><button id="report-monthly" class="btn-secondary">Monthly Report</button><button id="report-annually" class="btn-secondary">Annual Report</button><button id="download-transactions-btn" class="btn-primary"><span class="material-icons">download</span>Download Transactions</button></div>
+        <div id="reports" class="tab-content"><div class="card p-6"><h2 class="text-2xl font-bold mb-4 text-gray-700">Sales Reports</h2><div class="flex flex-wrap gap-4 mb-6"><button id="report-daily" class="btn-secondary">Daily</button><button id="report-monthly" class="btn-secondary">Monthly</button><button id="report-annually" class="btn-secondary">Annual</button><button id="download-transactions-btn" class="btn-primary"><span class="material-icons">download</span>Transactions</button><button id="print-barcodes-btn" class="btn-primary"><span class="material-icons">view_column</span>Barcodes</button><button id="manage-categories-btn" class="btn-primary"><span class="material-icons">category</span>Categories</button><button id="manage-sms-btn" class="btn-primary"><span class="material-icons">sms</span>SMS Templates</button><button id="download-sms-log-btn" class="btn-primary"><span class="material-icons">history</span>SMS Log</button></div>
 <div id="report-output" class="bg-gray-50 p-6 rounded-lg">
                     <h3 class="text-xl font-semibold text-gray-800 mb-2" id="report-title">Select a report to view.</h3>
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                        <div class="text-center p-4 bg-blue-100 rounded-lg">
-                            <p class="text-sm text-blue-800">Total Sales</p>
-                            <p class="text-2xl font-bold text-blue-900" id="report-total-sales">0</p>
-                        </div>
-                         <div class="text-center p-4 bg-green-100 rounded-lg">
-                            <p class="text-sm text-green-800">Total Revenue</p>
-                            <p class="text-2xl font-bold text-green-900" id="report-total-revenue">LKR 0</p>
-                        </div>
-                         <div class="text-center p-4 bg-yellow-100 rounded-lg">
-                            <p class="text-sm text-yellow-800">Total Cost</p>
-                            <p class="text-2xl font-bold text-yellow-900" id="report-total-cost">LKR 0</p>
-                        </div>
-                        <div class="text-center p-4 bg-red-100 rounded-lg">
-                            <p class="text-sm text-red-800">Total Profit</p>
-                            <p class="text-2xl font-bold text-red-900" id="report-total-profit">LKR 0</p>
-                        </div>
-                        <div class="text-center p-4 bg-orange-100 rounded-lg">
-                            <p class="text-sm text-orange-800">Total Outstanding</p>
-                            <p class="text-2xl font-bold text-orange-900" id="report-total-outstanding">LKR 0</p>
-                        </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <div class="text-center p-4 bg-blue-100 rounded-lg"><p class="text-sm text-blue-800">Total Sales</p><p class="text-2xl font-bold text-blue-900" id="report-total-sales">0</p></div>
+                        <div class="text-center p-4 bg-green-100 rounded-lg"><p class="text-sm text-green-800">Total Revenue</p><p class="text-2xl font-bold text-green-900" id="report-total-revenue">LKR 0</p></div>
+                        <div class="text-center p-4 bg-yellow-100 rounded-lg"><p class="text-sm text-yellow-800">Total Cost</p><p class="text-2xl font-bold text-yellow-900" id="report-total-cost">LKR 0</p></div>
+                        <div class="text-center p-4 bg-red-100 rounded-lg"><p class="text-sm text-red-800">Total Profit</p><p class="text-2xl font-bold text-red-900" id="report-total-profit">LKR 0</p></div>
+                        <div class="text-center p-4 bg-orange-100 rounded-lg"><p class="text-sm text-orange-800">Total Outstanding</p><p class="text-2xl font-bold text-orange-900" id="report-total-outstanding">LKR 0</p></div>
+                        <div class="text-center p-4 bg-teal-100 rounded-lg"><p class="text-sm text-teal-800">Cash In Hand</p><p class="text-2xl font-bold text-teal-900" id="report-cash-in-hand">LKR 0</p></div>
                     </div>
-                </div></div><div class="card p-6 mt-8"><h2 class="text-2xl font-bold mb-4 text-gray-700">Available Stock Details</h2><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"><div class="p-4 bg-gray-100 rounded-lg text-center"><p class="text-sm text-gray-600">Total Stock Value (Cost)</p><p id="total-stock-value" class="text-2xl font-bold text-gray-800">LKR 0.00</p></div><div class="p-4 bg-gray-100 rounded-lg text-center"><p class="text-sm text-gray-600">Potential Profit</p><p id="potential-profit" class="text-2xl font-bold text-gray-800">LKR 0.00</p></div></div><button id="download-stock-btn" class="btn-primary mb-4"><span class="material-icons">download</span>Download Stock Report</button><div id="stock-report-list" class="space-y-2"></div></div></div>
+                </div></div><div class="card p-6 mt-8"><h2 class="text-2xl font-bold mb-4 text-gray-700">Available Stock Details</h2><div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4"><div class="p-4 bg-gray-100 rounded-lg text-center"><p class="text-sm text-gray-600">Total Stock Value (Cost)</p><p id="total-stock-value" class="text-2xl font-bold text-gray-800">LKR 0.00</p></div><div class="p-4 bg-green-100 rounded-lg text-center"><p class="text-sm text-green-600">Potential Profit</p><p id="potential-profit" class="text-2xl font-bold text-green-800">LKR 0.00</p></div><div class="p-4 bg-blue-100 rounded-lg text-center"><p class="text-sm text-blue-600">Total Stock Value (Selling)</p><p id="total-stock-selling-price" class="text-2xl font-bold text-blue-800">LKR 0.00</p></div></div><button id="download-stock-btn" class="btn-primary mb-4"><span class="material-icons">download</span>Download Stock Report</button><div id="stock-report-list" class="space-y-2"></div></div></div>
     </div>
     
     <!-- Customer Dashboard -->
     <div id="customer-dashboard" class="page max-w-4xl mx-auto">
-         <header class="mb-8 flex justify-between items-center"><div><h1 id="customer-welcome-name" class="text-4xl font-bold text-gray-800">Welcome!</h1><p id="customer-info-contact" class="text-gray-500 mt-2">Your sales dashboard.</p></div><button id="customer-logout-btn" class="btn-secondary"><span class="material-icons">logout</span>Logout</button></header>
+        <header class="mb-8 flex flex-col sm:flex-row justify-between items-center text-center sm:text-left gap-4">
+            <div class="flex items-center gap-4">
+                <img src="https://firebasestorage.googleapis.com/v0/b/thinethhelthcare.firebasestorage.app/o/stock-images%2Flogo%20black%20BG.png?alt=media" alt="Vinu Batik Logo" class="w-20 h-20 rounded-full object-cover">
+                <div>
+                    <h1 id="customer-welcome-name" class="text-4xl font-bold text-gray-800">Welcome!</h1>
+                    <p id="customer-info-contact" class="text-gray-500 mt-2">Your sales dashboard.</p>
+                </div>
+            </div>
+            <button id="customer-logout-btn" class="btn-secondary"><span class="material-icons">logout</span>Logout</button>
+        </header>
         <div id="total-points-card" class="card p-6 mb-8 bg-indigo-100 border-indigo-400 border"><h2 class="text-xl font-bold text-indigo-800">Total Earned Points</h2><p id="total-points-amount" class="text-3xl font-bold text-indigo-900 mt-2">0 Points</p></div>
         <div id="outstanding-balance-card" class="card p-6 mb-8 bg-amber-100 border-amber-400 border hidden"><h2 class="text-xl font-bold text-amber-800">Outstanding Balance</h2><p id="outstanding-balance-amount" class="text-3xl font-bold text-amber-900 mt-2">LKR 0.00</p></div>
         <div class="card p-6"><h2 class="text-2xl font-bold mb-4 text-gray-700">Your Purchases</h2><div id="customer-sales-list" class="space-y-4"></div></div>
@@ -80,11 +78,15 @@
     <!-- Modals -->
     <div id="scanner-modal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold text-center mb-4">Scan Barcode / QR Code</h3><div id="reader" width="100%"></div><button id="close-scanner" class="btn-secondary w-full mt-4">Close Camera</button></div></div>
     <div id="edit-sale-modal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Edit Customer Info</h3><form id="edit-sale-form" class="space-y-4"><input type="hidden" id="edit-sale-key"><div><label class="block text-sm font-medium text-gray-600 mb-1">Customer Name</label><input type="text" id="edit-customerName" class="form-input" required></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Contact Number</label><input type="text" id="edit-customerContact" class="form-input" required></div><div class="flex justify-end space-x-3 mt-4"><button type="button" class="btn-secondary close-modal-btn">Cancel</button><button type="submit" class="btn-primary">Save Changes</button></div></form></div></div>
-    <div id="edit-stock-modal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Edit Stock Item</h3><form id="edit-stock-form" class="space-y-4"><input type="hidden" id="edit-stock-id"><input type="hidden" id="edit-stock-image-url"><div><label class="block text-sm font-medium text-gray-600 mb-1">Item ID</label><input type="text" id="edit-itemId-display" class="form-input bg-gray-100" readonly></div><div><label>Price (LKR)</label><input type="number" id="edit-itemPrice" class="form-input" required></div><div><label>Cost (LKR)</label><input type="number" id="edit-itemCost" class="form-input" required></div><div><label>Supplier</label><input type="text" id="edit-itemSupplier" class="form-input" required></div><div><label>Points</label><input type="number" id="edit-itemPoints" class="form-input"></div><div class="flex justify-end space-x-3 mt-4"><button type="button" class="btn-secondary close-modal-btn">Cancel</button><button type="submit" class="btn-primary">Save Changes</button></div></form></div></div>
+    <div id="edit-stock-modal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Edit Stock Item</h3><form id="edit-stock-form" class="space-y-4"><input type="hidden" id="edit-stock-id"><input type="hidden" id="edit-stock-image-url"><div><label class="block text-sm font-medium text-gray-600 mb-1">Item ID</label><input type="text" id="edit-itemId-display" class="form-input bg-gray-100" readonly></div><div><label for="edit-itemCategory" class="block text-sm font-medium text-gray-600 mb-1">Category</label><select id="edit-itemCategory" class="form-input"></select></div><div><label>Price (LKR)</label><input type="number" id="edit-itemPrice" class="form-input" required></div><div><label>Cost (LKR)</label><input type="number" id="edit-itemCost" class="form-input" required></div><div><label>Supplier</label><input type="text" id="edit-itemSupplier" class="form-input" required></div><div><label>Points</label><input type="number" id="edit-itemPoints" class="form-input"></div><div class="flex justify-end space-x-3 mt-4"><button type="button" class="btn-secondary close-modal-btn">Cancel</button><button type="submit" class="btn-primary">Save Changes</button></div></form></div></div>
     <div id="delete-confirm-modal" class="modal"><div class="modal-content max-w-sm text-center"><span class="material-icons text-5xl text-red-500 mb-4">warning</span><h3 class="text-xl font-bold mb-2">Are you sure?</h3><p class="text-gray-600 mb-6">Do you really want to delete this item? This process cannot be undone.</p><div class="flex justify-center space-x-3"><button type="button" class="btn-secondary close-modal-btn">Cancel</button><button type="button" id="confirm-delete-btn" class="btn-primary bg-red-600 hover:bg-red-700">Delete</button></div></div></div>
-    <div id="camera-modal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold text-center mb-4">Take a Photo</h3><video id="camera-feed" class="w-full rounded-md bg-gray-900" autoplay playsinline></video><canvas id="photo-canvas" class="hidden"></canvas><div class="flex justify-center gap-4 mt-4"><button id="take-photo-btn" class="btn-primary"><span class="material-icons">photo_camera</span>Take Photo</button><button type="button" class="btn-secondary close-modal-btn">Cancel</button></div></div></div>
+    <div id="camera-modal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold text-center mb-4">Take a Photo</h3><video id="camera-feed" class="w-full rounded-md bg-gray-900" playsinline></video><canvas id="photo-canvas" class="hidden"></canvas><div class="flex justify-center gap-4 mt-4"><button id="take-photo-btn" class="btn-primary"><span class="material-icons">photo_camera</span>Take Photo</button><button type="button" class="btn-secondary close-modal-btn">Cancel</button></div></div></div>
+    <div id="sms-templates-modal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Edit SMS Templates</h3><form id="sms-templates-form" class="space-y-4"><div><label class="block text-sm font-medium text-gray-600 mb-1">Sale Confirmation</label><textarea id="template-sale" class="form-input h-24" placeholder="Use placeholders like {{itemId}}, {{price}}, {{pointsEarned}}, {{totalPoints}}"></textarea></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Customer Login</label><textarea id="template-login" class="form-input h-24" placeholder="Use {{customerName}}"></textarea></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Installment Update</label><textarea id="template-installment" class="form-input h-24" placeholder="Use {{amount}}, {{balance}}"></textarea></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Payment Reminder</label><textarea id="template-reminder" class="form-input h-24" placeholder="Use {{customerName}}, {{balance}}"></textarea></div><div><label class="block text-sm font-medium text-gray-600 mb-1">Failed Login Attempt</label><textarea id="template-loginFailed" class="form-input h-24"></textarea></div><div class="flex justify-between items-center mt-4"><button type="button" id="reset-sms-btn" class="btn-secondary !bg-yellow-200 !text-yellow-800">Reset</button><div class="space-x-3"><button type="button" class="btn-secondary close-modal-btn">Cancel</button><button type="submit" class="btn-primary">Save Templates</button></div></div></form></div></div>
+    <div id="category-manager-modal" class="modal"><div class="modal-content"><h3 class="text-xl font-bold mb-4">Manage Categories</h3><form id="add-category-form" class="flex gap-2 mb-4"><input type="text" id="new-category-name" class="form-input" placeholder="New category name" required><button type="submit" class="btn-primary">Add</button></form><div id="category-list" class="space-y-2"></div><div class="flex justify-end mt-4"><button type="button" class="btn-secondary close-modal-btn">Close</button></div></div></div>
     
     <div id="toast" class="fixed bottom-5 right-5 bg-gray-800 text-white py-2 px-5 rounded-lg shadow-lg opacity-0 transition-opacity duration-300"><p id="toast-message"></p></div>
+    
+    <canvas id="barcode-canvas" style="display: none;"></canvas>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -96,7 +98,30 @@
         const database = firebase.database();
         const storage = firebase.storage();
         
-        let html5QrCode, currentScannerInput = null, allSalesData = [], capturedImageBlob = null, cameraStream = null;
+        let html5QrCode, currentScannerInput = null, allSalesData = [], capturedImageBlob = null, cameraStream = null, smsTemplates = {};
+        
+        const defaultTemplates = {
+            saleConfirmation: `Thank you for your purchase at Vinu Bathik!\nItem: {{category}} - {{itemId}}\nPrice: LKR {{price}}\nPoints Earned: {{pointsEarned}}\nTotal Points: {{totalPoints}}\n- Vinu Bathik`,
+            customerLogin: `Hi {{customerName}}, you have successfully logged into your Vinu Bathik account.`,
+            installmentUpdate: `Dear Customer, your payment of LKR {{amount}} has been received. Your new outstanding balance is LKR {{balance}}. Thank you. - Vinu Bathik`,
+            paymentReminder: `Hi {{customerName}}, this is a friendly reminder from Vinu Bathik about your outstanding payment of LKR {{balance}}. Please make a payment soon. Thank you.`,
+            loginFailed: `Someone tried to login to your Vinu Bathik account. If this was not you, please contact Vinu Bathik immediately.`
+        };
+
+        async function loadSmsTemplates() {
+            try {
+                const snapshot = await database.ref('config/smsTemplates').once('value');
+                if (snapshot.exists() && Object.keys(snapshot.val()).length >= Object.keys(defaultTemplates).length) {
+                    smsTemplates = snapshot.val();
+                } else {
+                    smsTemplates = defaultTemplates;
+                    await database.ref('config/smsTemplates').set(defaultTemplates);
+                }
+            } catch (error) {
+                console.error("Could not load SMS templates, using defaults.", error);
+                smsTemplates = defaultTemplates;
+            }
+        }
 
         function showPage(pageId) { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); document.getElementById(pageId).classList.add('active'); }
         function showToast(message, isError = false) { const t = document.getElementById('toast'); t.children[0].textContent = message; t.classList.remove('opacity-0'); t.style.backgroundColor = isError ? '#ef4444' : '#1f2937'; setTimeout(() => t.classList.add('opacity-0'), 3000); }
@@ -110,13 +135,35 @@
                 showPage('admin-panel'); 
                 fetchAndDisplayStock(); 
                 fetchAndDisplaySales(); 
-                renderStockReport(); 
+                renderStockReport();
+                loadSmsTemplates();
+                loadCategories();
+                checkAndSendReminders();
             } else { 
                 showToast('Invalid admin credentials.', true); 
             }
             passwordInput.value = '';
         });
-        document.getElementById('customer-login-btn').addEventListener('click', async () => { const phone = document.getElementById('customer-phone-login').value.trim(); if (!phone) return showToast('Please enter phone number.', true); try { const s = await database.ref('sales').orderByChild('customerContact').equalTo(phone).once('value'); if (s.val()) { populateCustomerDashboard(s.val()); showPage('customer-dashboard'); } else { showToast('No sales found.', true); } } catch (e) { showToast("Could not log in.", true); } });
+        document.getElementById('customer-login-btn').addEventListener('click', async () => { 
+            const phone = document.getElementById('customer-phone-login').value.trim(); 
+            if (!phone) return showToast('Please enter phone number.', true); 
+            try { 
+                await loadSmsTemplates(); 
+                const s = await database.ref('sales').orderByChild('customerContact').equalTo(phone).once('value'); 
+                if (s.val()) { 
+                    populateCustomerDashboard(s.val()); 
+                    showPage('customer-dashboard'); 
+                    const customerName = Object.values(s.val())[0].customerName;
+                    sendSms(phone, 'customerLogin', { customerName: customerName });
+                } else { 
+                    showToast('No sales found for this number.', true); 
+                    sendSms(phone, 'loginFailed', {});
+                } 
+            } catch (e) { 
+                console.error("Login Error:", e);
+                showToast("Could not log in.", true); 
+            } 
+        });
         document.getElementById('admin-logout-btn').addEventListener('click', logout);
         document.getElementById('customer-logout-btn').addEventListener('click', logout);
 
@@ -131,15 +178,16 @@
             e.preventDefault();
             const form = e.target;
             let itemId = form.itemId.value.trim();
+            const category = form.itemCategory.value;
             const price = form.itemPrice.value, cost = form.itemCost.value, supplier = form.itemSupplier.value.trim(), file = form.itemPicture.files[0], points = form.itemPoints.value;
             const imageFile = capturedImageBlob || file;
 
             if (!price || !cost || !supplier || !imageFile) return showToast("කරුණාකර සියලු ක්ෂේත්‍ර පුරවා පින්තූරයක් එක් කරන්න.", true);
 
             try {
-                if (!itemId) { // Auto-generate ID if empty
+                if (!itemId) { 
                     itemId = database.ref('stock').push().key;
-                } else { // Check for duplicate ID
+                } else {
                     const existingItem = await database.ref('stock/' + itemId).once('value');
                     if (existingItem.exists()) {
                         return showToast('මෙම ID එක දැනටමත් පද්ධතියේ ඇත.', true);
@@ -150,12 +198,13 @@
                 const url = await (await ref.put(imageFile)).ref.getDownloadURL();
                 const itemData = {
                     itemId,
+                    category: category,
                     price: parseFloat(price),
                     cost: parseFloat(cost),
                     supplier,
                     imageUrl: url,
                     points: points ? parseInt(points, 10) : 0,
-                    status: 'available' // Set initial status
+                    status: 'available'
                 };
                 await database.ref('stock/' + itemId).set(itemData);
                 showToast("නව භාණ්ඩය සාර්ථකව ඇතුළත් කරන ලදී!");
@@ -187,13 +236,14 @@
                                 <button onclick='openEditStockModal(${JSON.stringify(i)})' class="p-1.5 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200"><span class="material-icons text-sm">edit</span></button>
                                 <button onclick="confirmDeleteStockItem('${i.itemId}', '${i.imageUrl}')" class="p-1.5 bg-red-100 text-red-600 rounded-full hover:bg-red-200"><span class="material-icons text-sm">delete</span></button>
                             </div>
-                            <img src="${i.imageUrl}" class="w-full h-32 object-cover rounded-md mb-2">
+                            <img src="${i.imageUrl}" onerror="this.src='https://placehold.co/600x400/e2e8f0/e2e8f0?text=img'" class="w-full h-32 object-cover rounded-md mb-2">
                             <h3 class="font-bold text-lg">${i.itemId}</h3>
                             <div class="flex justify-between items-center">
                                 <p class="text-indigo-600 font-semibold">LKR ${i.price.toFixed(2)}</p>
                                 ${i.points ? `<p class="text-xs font-bold text-amber-600 bg-amber-100 px-2 py-1 rounded-full">${i.points} pts</p>` : ''}
                             </div>
                             <p class="text-sm text-gray-500 mt-1">Supplier: ${i.supplier}</p>
+                            <p class="text-xs text-gray-400 capitalize">${i.category || 'N/A'}</p>
                         </div>`;
                     });
                 } else {
@@ -202,8 +252,37 @@
             });
         }
 
-        function openEditStockModal(item) { const modal = document.getElementById('edit-stock-modal'); modal.querySelector('#edit-stock-id').value = item.itemId; modal.querySelector('#edit-stock-image-url').value = item.imageUrl; modal.querySelector('#edit-itemId-display').value = item.itemId; modal.querySelector('#edit-itemPrice').value = item.price; modal.querySelector('#edit-itemCost').value = item.cost; modal.querySelector('#edit-itemSupplier').value = item.supplier; modal.querySelector('#edit-itemPoints').value = item.points || ''; modal.style.display = 'flex'; }
-        document.getElementById('edit-stock-form').addEventListener('submit', async (e) => { e.preventDefault(); const form = e.target; const itemId = form['edit-stock-id'].value; const updatedData = { price: parseFloat(form['edit-itemPrice'].value), cost: parseFloat(form['edit-itemCost'].value), supplier: form['edit-itemSupplier'].value, points: form['edit-itemPoints'].value ? parseInt(form['edit-itemPoints'].value, 10) : 0 }; try { await database.ref('stock/' + itemId).update(updatedData); showToast('Stock item updated!'); document.getElementById('edit-stock-modal').style.display = 'none'; } catch(err) { showToast('Failed to update item.', true); } });
+        function openEditStockModal(item) { 
+            const modal = document.getElementById('edit-stock-modal'); 
+            modal.querySelector('#edit-stock-id').value = item.itemId; 
+            modal.querySelector('#edit-stock-image-url').value = item.imageUrl; 
+            modal.querySelector('#edit-itemId-display').value = item.itemId; 
+            modal.querySelector('#edit-itemCategory').value = item.category || 'saree';
+            modal.querySelector('#edit-itemPrice').value = item.price; 
+            modal.querySelector('#edit-itemCost').value = item.cost; 
+            modal.querySelector('#edit-itemSupplier').value = item.supplier; 
+            modal.querySelector('#edit-itemPoints').value = item.points || ''; 
+            modal.style.display = 'flex'; 
+        }
+        document.getElementById('edit-stock-form').addEventListener('submit', async (e) => { 
+            e.preventDefault(); 
+            const form = e.target; 
+            const itemId = form['edit-stock-id'].value; 
+            const updatedData = { 
+                price: parseFloat(form['edit-itemPrice'].value), 
+                cost: parseFloat(form['edit-itemCost'].value), 
+                supplier: form['edit-itemSupplier'].value, 
+                points: form['edit-itemPoints'].value ? parseInt(form['edit-itemPoints'].value, 10) : 0,
+                category: form['edit-itemCategory'].value
+            }; 
+            try { 
+                await database.ref('stock/' + itemId).update(updatedData); 
+                showToast('Stock item updated!'); 
+                document.getElementById('edit-stock-modal').style.display = 'none'; 
+            } catch(err) { 
+                showToast('Failed to update item.', true); 
+            } 
+        });
 
         function confirmDeleteStockItem(itemId, imageUrl) {
             const isItemInSale = allSalesData.some(sale => sale.itemId === itemId);
@@ -217,12 +296,22 @@
         }
         async function deleteStockItem(itemId, imageUrl) { try { await database.ref('stock/' + itemId).remove(); await storage.refFromURL(imageUrl).delete(); showToast('Item deleted successfully!'); } catch (err) { showToast('Failed to delete item.', true); console.error(err); } finally { document.getElementById('delete-confirm-modal').style.display = 'none'; } }
         
-        // CAMERA LOGIC
-        document.getElementById('open-camera-btn').addEventListener('click', async () => { const modal = document.getElementById('camera-modal'); const video = document.getElementById('camera-feed'); modal.style.display = 'flex'; try { cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); video.srcObject = cameraStream; } catch (err) { showToast('Could not access camera.', true); modal.style.display = 'none'; } });
+        document.getElementById('open-camera-btn').addEventListener('click', async () => {
+            const modal = document.getElementById('camera-modal');
+            const video = document.getElementById('camera-feed');
+            modal.style.display = 'flex';
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = cameraStream;
+                video.play();
+            } catch (err) {
+                showToast('Could not access camera.', true);
+                modal.style.display = 'none';
+            }
+        });
         document.getElementById('take-photo-btn').addEventListener('click', () => { const video = document.getElementById('camera-feed'); const canvas = document.getElementById('photo-canvas'); const preview = document.getElementById('image-preview'); canvas.width = video.videoWidth; canvas.height = video.videoHeight; canvas.getContext('2d').drawImage(video, 0, 0); canvas.toBlob(blob => { capturedImageBlob = blob; preview.src = URL.createObjectURL(blob); preview.classList.remove('hidden'); document.getElementById('itemPicture').value = ''; }, 'image/jpeg'); closeCamera(); });
-        function closeCamera() { if (cameraStream) { cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; } document.getElementById('camera-modal').style.display = 'none'; }
+        function closeCamera() { const video = document.getElementById('camera-feed'); if (cameraStream) { cameraStream.getTracks().forEach(track => track.stop()); cameraStream = null; video.srcObject = null; } document.getElementById('camera-modal').style.display = 'none'; }
 
-        // SALES MANAGEMENT
         document.querySelectorAll('input[name="paymentType"]').forEach(r => r.addEventListener('change', (e) => { document.getElementById('downpayment-section').classList.toggle('hidden', e.target.value !== 'installment'); }));
         document.getElementById('add-sale-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -249,23 +338,45 @@
                 }
                 
                 await database.ref('sales').push(saleData);
-                await stockRef.update({ status: 'sold' }); // Update stock status to sold
+                await stockRef.update({ status: 'sold' }); 
+
+                const customerSalesSnap = await database.ref('sales').orderByChild('customerContact').equalTo(contact).once('value');
+                let totalPoints = 0;
+                if (customerSalesSnap.exists()) { Object.values(customerSalesSnap.val()).forEach(s => { totalPoints += s.points || 0; }); }
+
+                sendSms(contact, 'saleConfirmation', { category: stock.category, itemId: itemId, price: stock.price.toFixed(2), pointsEarned: stock.points || 0, totalPoints: totalPoints });
 
                 showToast("Sale created!");
                 form.reset();
                 document.getElementById('downpayment-section').classList.add('hidden');
-            } catch (err) {
-                showToast("Failed to create sale.", true);
-                console.error(err);
-            }
+            } catch (err) { showToast("Failed to create sale.", true); console.error(err); }
         });
-        async function updatePayment(key, inputId) { const amountStr = document.getElementById(inputId).value; const amount = parseFloat(amountStr); if (isNaN(amount) || amount <= 0) return showToast("Invalid amount.", true); const saleRef = database.ref('sales/' + key); try { const sale = (await saleRef.once('value')).val(); if (!sale) return showToast("Sale not found.", true); const totalPaid = Object.values(sale.payments || {}).reduce((sum, p) => sum + p.amount, 0); if (totalPaid + amount > sale.totalPrice) return showToast("Payment exceeds balance.", true); await database.ref(`sales/${key}/payments`).push({ amount: amount, date: new Date().toISOString() }); const newTotalPaid = totalPaid + amount; if (newTotalPaid >= sale.totalPrice) await saleRef.update({ status: 'complete' }); showToast("Payment updated!"); } catch (e) { showToast("Failed to update.", true); } }
+        async function updatePayment(key, inputId) { 
+            const amountStr = document.getElementById(inputId).value; 
+            const amount = parseFloat(amountStr); 
+            if (isNaN(amount) || amount <= 0) return showToast("Invalid amount.", true); 
+            const saleRef = database.ref('sales/' + key); 
+            try { 
+                const sale = (await saleRef.once('value')).val(); 
+                if (!sale) return showToast("Sale not found.", true); 
+                const totalPaid = Object.values(sale.payments || {}).reduce((sum, p) => sum + p.amount, 0); 
+                if (totalPaid + amount > sale.totalPrice) return showToast("Payment exceeds balance.", true); 
+                
+                await database.ref(`sales/${key}/payments`).push({ amount: amount, date: new Date().toISOString() }); 
+                const newTotalPaid = totalPaid + amount;
+                const newBalance = sale.totalPrice - newTotalPaid;
+
+                if (newTotalPaid >= sale.totalPrice) { await saleRef.update({ status: 'complete' }); } 
+                showToast("Payment updated!"); 
+                sendSms(sale.customerContact, 'installmentUpdate', { amount: amount.toFixed(2), balance: newBalance.toFixed(2) });
+            } catch (e) { showToast("Failed to update.", true); } 
+        }
         
         const editSaleModal = document.getElementById('edit-sale-modal');
         function openEditModal(key, name, contact) { editSaleModal.querySelector('#edit-sale-key').value = key; editSaleModal.querySelector('#edit-customerName').value = name; editSaleModal.querySelector('#edit-customerContact').value = contact; editSaleModal.style.display = 'flex'; }
         document.getElementById('edit-sale-form').addEventListener('submit', async (e) => { e.preventDefault(); const key = e.target['edit-sale-key'].value; const name = e.target['edit-customerName'].value; const contact = e.target['edit-customerContact'].value; await database.ref(`sales/${key}`).update({ customerName: name, customerContact: contact }); showToast('Customer info updated!'); editSaleModal.style.display = 'none'; });
 
-        function fetchAndDisplaySales() { database.ref('sales').on('value', async (snap) => { const stock = (await database.ref('stock').once('value')).val(); allSalesData = []; if (snap.val() && stock) { for(const key in snap.val()){ const sale = snap.val()[key]; if(stock[sale.itemId]) allSalesData.push({ key, ...sale, itemDetails: stock[sale.itemId] }); } allSalesData.reverse(); renderSales(allSalesData); let totalOutstanding = 0; allSalesData.forEach(s => { if (s.status === 'ongoing') { const totalPaid = Object.values(s.payments || {}).reduce((sum, p) => sum + p.amount, 0); totalOutstanding += s.totalPrice - totalPaid; } }); document.getElementById('report-total-outstanding').textContent = `LKR ${totalOutstanding.toFixed(2)}`; } else { document.getElementById('sales-list').innerHTML = '<p>No sales found.</p>'; } }); }
+        function fetchAndDisplaySales() { database.ref('sales').on('value', async (snap) => { const stock = (await database.ref('stock').once('value')).val(); allSalesData = []; if (snap.val() && stock) { for(const key in snap.val()){ const sale = snap.val()[key]; if(stock[sale.itemId]) allSalesData.push({ key, ...sale, itemDetails: stock[sale.itemId] }); } allSalesData.reverse(); renderSales(allSalesData); let totalOutstanding = 0, cashInHand = 0; allSalesData.forEach(s => { const totalPaid = Object.values(s.payments || {}).reduce((sum, p) => sum + p.amount, 0); cashInHand += totalPaid; if (s.status === 'ongoing') { totalOutstanding += s.totalPrice - totalPaid; } }); document.getElementById('report-total-outstanding').textContent = `LKR ${totalOutstanding.toFixed(2)}`; document.getElementById('report-cash-in-hand').textContent = `LKR ${cashInHand.toFixed(2)}`; } else { document.getElementById('sales-list').innerHTML = '<p>No sales found.</p>'; } }); }
         
         function renderSales(sales) { 
             const list = document.getElementById('sales-list'); 
@@ -278,15 +389,14 @@
                 if(s.payments) { paymentHistory = `<div class="text-xs text-gray-500 mt-2 space-y-1">` + Object.values(s.payments).map(p => `<div>- Paid LKR ${p.amount.toFixed(2)} on ${new Date(p.date).toLocaleDateString()}</div>`).join('') + `</div>`; } 
                 if (!isComplete) { const rem = s.totalPrice - totalPaid; paymentInfo = `<p class="text-sm text-red-600 font-semibold mt-2">Rem: LKR ${rem.toFixed(2)}</p><div class="mt-2 flex flex-wrap gap-2 items-center"><input type="number" id="payment-${s.key}" class="form-input flex-1 min-w-[120px]" placeholder="මුදල"><button onclick="updatePayment('${s.key}', 'payment-${s.key}')" class="btn-primary !px-3 !py-2 flex-shrink-0"><span class="material-icons">payment</span></button></div>`; } 
                 const pointsDisplay = s.points ? `<p class="text-xs font-bold text-amber-600">${s.points} pts</p>` : '';
-                list.innerHTML += `<div class="flex items-start p-4 border rounded-lg bg-white space-x-4"><img src="${s.itemDetails.imageUrl}" class="w-20 h-20 object-cover rounded-md flex-shrink-0"><div class="flex-grow"><div><div class="flex justify-between items-center"><h4 class="font-bold">${s.customerName}</h4><div class="flex items-center gap-2">${pointsDisplay}<span class="px-2 py-1 text-xs font-semibold rounded-full ${isComplete ? 'text-green-800 bg-green-200' : 'text-yellow-800 bg-yellow-200'}">${s.status}</span></div></div><button onclick="openEditModal('${s.key}', '${s.customerName}', '${s.customerContact}')" class="text-xs text-indigo-500 hover:underline">edit</button></div><p class="text-sm text-gray-600">${s.customerContact}</p><p class="text-sm font-mono bg-gray-100 inline-block px-2 py-0.5 rounded mt-1">${s.itemId}</p>${paymentHistory}${paymentInfo}</div></div>`; 
+                list.innerHTML += `<div class="flex items-start p-4 border rounded-lg bg-white space-x-4"><img src="${s.itemDetails.imageUrl}" onerror="this.src='https://placehold.co/600x400/e2e8f0/e2e8f0?text=img'" class="w-20 h-20 object-cover rounded-md flex-shrink-0"><div class="flex-grow"><div><div class="flex justify-between items-center"><h4 class="font-bold">${s.customerName}</h4><div class="flex items-center gap-2">${pointsDisplay}<span class="px-2 py-1 text-xs font-semibold rounded-full ${isComplete ? 'text-green-800 bg-green-200' : 'text-yellow-800 bg-yellow-200'}">${s.status}</span></div></div><button onclick="openEditModal('${s.key}', '${s.customerName}', '${s.customerContact}')" class="text-xs text-indigo-500 hover:underline">edit</button></div><p class="text-sm text-gray-600">${s.customerContact}</p><p class="text-sm font-mono bg-gray-100 inline-block px-2 py-0.5 rounded mt-1">${s.itemId}</p>${paymentHistory}${paymentInfo}</div></div>`; 
             }); 
         }
 
         document.getElementById('sales-search').addEventListener('input', (e) => { const term = e.target.value.toLowerCase(); renderSales(allSalesData.filter(s => s.customerName.toLowerCase().includes(term) || s.customerContact.toLowerCase().includes(term) || s.itemId.toLowerCase().includes(term))); });
 
-        async function populateCustomerDashboard(data) { const list = document.getElementById('customer-sales-list'); list.innerHTML = ''; let name, contact, outstanding = 0, totalPoints = 0; const stock = (await database.ref('stock').once('value')).val() || {}; const sales = Object.values(data).reverse(); if (sales.length > 0) { name = sales[0].customerName; contact = sales[0].customerContact; document.getElementById('customer-welcome-name').textContent = `Welcome, ${name}`; document.getElementById('customer-info-contact').textContent = contact; } sales.forEach(s => { const item = stock[s.itemId]; if (!item) return; if(s.points) { totalPoints += s.points; } const totalPaid = Object.values(s.payments || {}).reduce((sum, p) => sum + p.amount, 0); let balanceInfo = ''; if (s.status === 'ongoing') { const bal = s.totalPrice - totalPaid; outstanding += bal; balanceInfo = `<p class="text-sm font-semibold text-red-600 mt-2">Balance: LKR ${bal.toFixed(2)}</p>`; } const pointsDisplay = s.points ? `<p class="text-sm font-semibold text-amber-600 mt-2">${s.points} Points Earned</p>` : ''; let paymentHistory = `<div class="text-xs text-gray-500 mt-2 space-y-1 border-t pt-2">` + Object.values(s.payments || {}).map(p => `<div>- Paid LKR ${p.amount.toFixed(2)} on ${new Date(p.date).toLocaleDateString()}</div>`).join('') + `</div>`; list.innerHTML += `<div class="flex items-start p-4 border rounded-lg bg-white space-x-4"><img src="${item.imageUrl}" class="w-20 h-20 object-cover rounded-md flex-shrink-0"><div class="flex-grow"><div class="flex justify-between items-center"><h4 class="font-bold">${item.itemId}</h4><span class="text-lg font-semibold text-indigo-600">LKR ${s.totalPrice.toFixed(2)}</span></div><p class="text-sm text-gray-500">Purchased: ${new Date(s.saleDate).toLocaleDateString()}</p>${balanceInfo}${pointsDisplay}${paymentHistory}</div></div>`; }); document.getElementById('total-points-amount').textContent = `${totalPoints} Points`; const card = document.getElementById('outstanding-balance-card'); if(outstanding > 0) { card.querySelector('p').textContent = `LKR ${outstanding.toFixed(2)}`; card.classList.remove('hidden'); } else { card.classList.add('hidden'); } }
+        async function populateCustomerDashboard(data) { const list = document.getElementById('customer-sales-list'); list.innerHTML = ''; let name, contact, outstanding = 0, totalPoints = 0; const stock = (await database.ref('stock').once('value')).val() || {}; const sales = Object.values(data).reverse(); if (sales.length > 0) { name = sales[0].customerName; contact = sales[0].customerContact; document.getElementById('customer-welcome-name').textContent = `Welcome, ${name}`; document.getElementById('customer-info-contact').textContent = contact; } sales.forEach(s => { const item = stock[s.itemId]; if (!item) return; if(s.points) { totalPoints += s.points; } const totalPaid = Object.values(s.payments || {}).reduce((sum, p) => sum + p.amount, 0); let balanceInfo = ''; if (s.status === 'ongoing') { const bal = s.totalPrice - totalPaid; outstanding += bal; balanceInfo = `<p class="text-sm font-semibold text-red-600 mt-2">Balance: LKR ${bal.toFixed(2)}</p>`; } const pointsDisplay = s.points ? `<p class="text-sm font-semibold text-amber-600 mt-2">${s.points} Points Earned</p>` : ''; let paymentHistory = `<div class="text-xs text-gray-500 mt-2 space-y-1 border-t pt-2">` + Object.values(s.payments || {}).map(p => `<div>- Paid LKR ${p.amount.toFixed(2)} on ${new Date(p.date).toLocaleDateString()}</div>`).join('') + `</div>`; list.innerHTML += `<div class="flex items-start p-4 border rounded-lg bg-white space-x-4"><img src="${item.imageUrl}" onerror="this.src='https://placehold.co/600x400/e2e8f0/e2e8f0?text=img'" class="w-20 h-20 object-cover rounded-md flex-shrink-0"><div class="flex-grow"><div class="flex justify-between items-center"><h4 class="font-bold">${item.itemId}</h4><span class="text-lg font-semibold text-indigo-600">LKR ${s.totalPrice.toFixed(2)}</span></div><p class="text-sm text-gray-500">Purchased: ${new Date(s.saleDate).toLocaleDateString()}</p>${balanceInfo}${pointsDisplay}${paymentHistory}</div></div>`; }); document.getElementById('total-points-amount').textContent = `${totalPoints} Points`; const card = document.getElementById('outstanding-balance-card'); if(outstanding > 0) { card.querySelector('p').textContent = `LKR ${outstanding.toFixed(2)}`; card.classList.remove('hidden'); } else { card.classList.add('hidden'); } }
 
-        // REPORTS
         async function generateReport(period) { const sales = (await database.ref('sales').once('value')).val() || {}; const stock = (await database.ref('stock').once('value')).val() || {}; const now = new Date(); const filtered = Object.values(sales).filter(s => { const d = new Date(s.saleDate); if (period === 'daily') return d.toDateString() === now.toDateString(); if (period === 'monthly') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); if (period === 'annually') return d.getFullYear() === now.getFullYear(); return false; }); let totalSales = filtered.length, revenue = 0, cost = 0; filtered.forEach(s => { revenue += s.totalPrice; if (stock[s.itemId]) cost += stock[s.itemId].cost; }); document.getElementById('report-title').textContent = `${period.charAt(0).toUpperCase() + period.slice(1)} Report`; document.getElementById('report-total-sales').textContent = totalSales; document.getElementById('report-total-revenue').textContent = `LKR ${revenue.toFixed(2)}`; document.getElementById('report-total-cost').textContent = `LKR ${cost.toFixed(2)}`; document.getElementById('report-total-profit').textContent = `LKR ${(revenue - cost).toFixed(2)}`; }
         document.getElementById('report-daily').addEventListener('click', () => generateReport('daily')); document.getElementById('report-monthly').addEventListener('click', () => generateReport('monthly')); document.getElementById('report-annually').addEventListener('click', () => generateReport('annually'));
         
@@ -310,27 +420,235 @@
             const stock = (await database.ref('stock').once('value')).val() || {};
             const stockItems = Object.values(stock).filter(item => item.status !== 'sold');
             
-            let totalCostValue = 0, potentialProfit = 0;
+            let totalCostValue = 0, potentialProfit = 0, totalSellingPrice = 0;
             const list = document.getElementById('stock-report-list'); 
             list.innerHTML = `<div class="grid grid-cols-3 font-bold border-b pb-2"><p>Item ID</p><p>Price</p><p>Supplier</p></div>`; 
             
             stockItems.forEach(i => { 
                 totalCostValue += i.cost;
                 potentialProfit += (i.price - i.cost);
+                totalSellingPrice += i.price;
                 list.innerHTML += `<div class="grid grid-cols-3 py-1 border-b"><p>${i.itemId}</p><p>LKR ${i.price.toFixed(2)}</p><p>${i.supplier}</p></div>`; 
             }); 
             
             document.getElementById('total-stock-value').textContent = `LKR ${totalCostValue.toFixed(2)}`;
             document.getElementById('potential-profit').textContent = `LKR ${potentialProfit.toFixed(2)}`;
+            document.getElementById('total-stock-selling-price').textContent = `LKR ${totalSellingPrice.toFixed(2)}`;
         }
+        
+        async function generateBarcodePDF() {
+            showToast('Generating barcodes...');
+            try {
+                const configRef = database.ref('config/lastBarcode');
+                const snapshot = await configRef.once('value');
+                let lastBarcode = snapshot.val() || 100;
+                
+                const startNumber = lastBarcode + 1;
+                const barcodesPerPage = 55;
+                const endNumber = startNumber + barcodesPerPage - 1;
 
-        // Close Modals
-        document.querySelectorAll('.close-modal-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.target.closest('.modal').style.display = 'none';
-                if(e.target.closest('.modal').id === 'camera-modal') closeCamera();
-            });
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                const canvas = document.getElementById('barcode-canvas');
+
+                const pageMargin = 10, barcodeWidth = 30, barcodeHeight = 15, horizontalSpacing = 5, verticalSpacing = 10, numCols = 5;
+                let x = pageMargin, y = pageMargin, col = 0;
+
+                for (let i = startNumber; i <= endNumber; i++) {
+                    JsBarcode(canvas, String(i), { format: "CODE128", text: `Vinu Bathik ${i}`, width: 2, height: 40, fontSize: 12, textMargin: 0, margin: 5 });
+                    doc.addImage(canvas.toDataURL('image/png'), 'PNG', x, y, barcodeWidth, barcodeHeight);
+                    x += barcodeWidth + horizontalSpacing;
+                    col++;
+                    if (col >= numCols) { col = 0; x = pageMargin; y += barcodeHeight + verticalSpacing; }
+                }
+                doc.save(`barcodes_${startNumber}-${endNumber}.pdf`);
+                await configRef.set(endNumber);
+                showToast('Barcodes PDF generated successfully!');
+            } catch (error) { console.error("Barcode generation failed:", error); showToast('Failed to generate barcodes.', true); }
+        }
+        document.getElementById('print-barcodes-btn').addEventListener('click', generateBarcodePDF);
+
+        const TEXTBEE_API_KEY = '810d145b-29db-427a-a810-3a12cdfbacdf';
+        const TEXTBEE_DEVICE_ID = '68d8b92eceb77880de829b26';
+        async function sendSms(phoneNumber, templateName, data) {
+            let message = smsTemplates[templateName] || '';
+            if (!message) { console.error(`SMS template '${templateName}' not found.`); return; }
+            for (const key in data) { message = message.replace(new RegExp(`{{${key}}}`, 'g'), data[key]); }
+            let formattedPhoneNumber = phoneNumber.trim();
+            if (formattedPhoneNumber.startsWith('0')) { formattedPhoneNumber = '+94' + formattedPhoneNumber.substring(1); } 
+            else if (!formattedPhoneNumber.startsWith('+94')) { console.error("Invalid phone number format for SMS:", phoneNumber); return; }
+            if (!TEXTBEE_API_KEY || !TEXTBEE_DEVICE_ID) { console.error("TextBee API Key or Device ID is missing."); return; }
+            const url = `https://api.textbee.dev/api/v1/gateway/devices/${TEXTBEE_DEVICE_ID}/send-sms`;
+            const payload = { recipients: [formattedPhoneNumber], message: message };
+            const headers = { 'x-api-key': TEXTBEE_API_KEY };
+            try {
+                const response = await axios.post(url, payload, { headers });
+                console.log('SMS sent successfully:', response.data);
+                showToast(`SMS sent to ${phoneNumber}`);
+                await database.ref('smsLogs').push({ date: new Date().toISOString(), description: templateName, contactNumber: phoneNumber, message: message });
+            } catch (error) { console.error('Failed to send SMS:', error.response ? error.response.data : error.message); showToast('Failed to send SMS.', true); }
+        }
+        async function checkAndSendReminders() {
+            const salesSnap = await database.ref('sales').once('value');
+            if (!salesSnap.exists()) return;
+            const sales = salesSnap.val();
+            const now = new Date();
+            for (const key in sales) {
+                const sale = sales[key];
+                if (sale.status === 'ongoing') {
+                    const saleDate = new Date(sale.saleDate);
+                    const daysPassed = Math.floor((now - saleDate) / (1000 * 60 * 60 * 24));
+                    const reminderCycle = Math.floor(daysPassed / 30);
+                    if (reminderCycle > 0) {
+                        const remindersSent = sale.remindersSent || {};
+                        if (!remindersSent[reminderCycle]) {
+                            const totalPaid = Object.values(sale.payments || {}).reduce((sum, p) => sum + p.amount, 0);
+                            const balance = sale.totalPrice - totalPaid;
+                            if (balance > 0) {
+                                sendSms(sale.customerContact, 'paymentReminder', { customerName: sale.customerName, balance: balance.toFixed(2) });
+                                await database.ref(`sales/${key}/remindersSent/${reminderCycle}`).set(true);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        document.getElementById('manage-sms-btn').addEventListener('click', () => {
+            document.getElementById('template-sale').value = smsTemplates.saleConfirmation || '';
+            document.getElementById('template-login').value = smsTemplates.customerLogin || '';
+            document.getElementById('template-installment').value = smsTemplates.installmentUpdate || '';
+            document.getElementById('template-reminder').value = smsTemplates.paymentReminder || '';
+            document.getElementById('template-loginFailed').value = smsTemplates.loginFailed || '';
+            document.getElementById('sms-templates-modal').style.display = 'flex';
         });
+        document.getElementById('sms-templates-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newTemplates = { saleConfirmation: document.getElementById('template-sale').value, customerLogin: document.getElementById('template-login').value, installmentUpdate: document.getElementById('template-installment').value, paymentReminder: document.getElementById('template-reminder').value, loginFailed: document.getElementById('template-loginFailed').value };
+            try { await database.ref('config/smsTemplates').set(newTemplates); smsTemplates = newTemplates; showToast('SMS templates saved successfully!'); document.getElementById('sms-templates-modal').style.display = 'none'; } 
+            catch (error) { showToast('Failed to save templates.', true); console.error(error); }
+        });
+        document.getElementById('reset-sms-btn').addEventListener('click', async () => {
+            if (confirm('Are you sure you want to reset all SMS templates to their default values?')) {
+                try {
+                    await database.ref('config/smsTemplates').set(defaultTemplates);
+                    smsTemplates = defaultTemplates;
+                    // Repopulate the form fields with default values
+                    document.getElementById('template-sale').value = defaultTemplates.saleConfirmation || '';
+                    document.getElementById('template-login').value = defaultTemplates.customerLogin || '';
+                    document.getElementById('template-installment').value = defaultTemplates.installmentUpdate || '';
+                    document.getElementById('template-reminder').value = defaultTemplates.paymentReminder || '';
+                    document.getElementById('template-loginFailed').value = defaultTemplates.loginFailed || '';
+                    showToast('SMS templates have been reset.');
+                } catch (error) {
+                    showToast('Failed to reset templates.', true);
+                    console.error(error);
+                }
+            }
+        });
+        async function downloadSmsLog() {
+            try {
+                const snapshot = await database.ref('smsLogs').once('value');
+                if (!snapshot.exists()) { showToast("No SMS logs to download.", true); return; }
+                const logs = Object.values(snapshot.val());
+                let content = 'SMS Log Report\n================\n\n' + `${pad('Date', 25)}${pad('Description', 20)}${pad('Contact Number', 20)}\n` + '-'.repeat(65) + '\n';
+                logs.reverse().forEach(log => { content += `${pad(new Date(log.date).toLocaleString(), 25)}${pad(log.description, 20)}${pad(log.contactNumber, 20)}\n`; });
+                downloadFile(content, 'sms_log.txt');
+            } catch (error) { showToast("Failed to download SMS log.", true); console.error(error); }
+        }
+        document.getElementById('download-sms-log-btn').addEventListener('click', downloadSmsLog);
+        
+        // CATEGORY MANAGEMENT
+        function loadCategories() {
+            database.ref('config/categories').on('value', (snapshot) => {
+                const categories = snapshot.val() || {};
+                const dropdowns = [document.getElementById('itemCategory'), document.getElementById('edit-itemCategory')];
+                dropdowns.forEach(dropdown => {
+                    if (!dropdown) return;
+                    const selectedValue = dropdown.value;
+                    dropdown.innerHTML = '';
+                    if (Object.keys(categories).length === 0) {
+                        dropdown.innerHTML = '<option value="saree">Saree</option><option value="purse">Purse</option>'; // Default fallback
+                    } else {
+                        for (const key in categories) {
+                            const option = document.createElement('option');
+                            option.value = categories[key].name;
+                            option.textContent = categories[key].name;
+                            dropdown.appendChild(option);
+                        }
+                    }
+                    if (selectedValue) dropdown.value = selectedValue;
+                });
+                renderCategoryList(categories);
+            });
+        }
+        function renderCategoryList(categories) {
+            const list = document.getElementById('category-list');
+            list.innerHTML = '';
+            if (Object.keys(categories).length === 0) {
+                list.innerHTML = '<p class="text-gray-500">No categories added yet.</p>';
+                return;
+            }
+            for (const key in categories) {
+                const cat = categories[key];
+                list.innerHTML += `
+                    <div class="flex items-center justify-between p-2 border rounded-md">
+                        <span id="cat-name-${key}">${cat.name}</span>
+                        <div class="flex items-center gap-2" id="cat-actions-${key}">
+                            <button onclick="showEditCategoryInput('${key}', '${cat.name}')" class="p-1 text-blue-600 rounded-full hover:bg-blue-100"><span class="material-icons text-sm">edit</span></button>
+                            <button onclick="deleteCategory('${key}', '${cat.name}')" class="p-1 text-red-600 rounded-full hover:bg-red-100"><span class="material-icons text-sm">delete</span></button>
+                        </div>
+                    </div>`;
+            }
+        }
+        function showEditCategoryInput(key, currentName) {
+            const span = document.getElementById(`cat-name-${key}`);
+            const actions = document.getElementById(`cat-actions-${key}`);
+            span.innerHTML = `<input type="text" id="edit-cat-input-${key}" value="${currentName}" class="form-input !p-1 text-sm">`;
+            actions.innerHTML = `
+                <button onclick="saveCategoryEdit('${key}')" class="p-1 text-green-600 rounded-full hover:bg-green-100"><span class="material-icons text-sm">check</span></button>
+                <button onclick="cancelCategoryEdit('${key}', '${currentName}')" class="p-1 text-gray-600 rounded-full hover:bg-gray-100"><span class="material-icons text-sm">close</span></button>
+            `;
+        }
+        function cancelCategoryEdit(key, originalName) {
+            document.getElementById(`cat-name-${key}`).textContent = originalName;
+            document.getElementById(`cat-actions-${key}`).innerHTML = `
+                <button onclick="showEditCategoryInput('${key}', '${originalName}')" class="p-1 text-blue-600 rounded-full hover:bg-blue-100"><span class="material-icons text-sm">edit</span></button>
+                <button onclick="deleteCategory('${key}', '${originalName}')" class="p-1 text-red-600 rounded-full hover:bg-red-100"><span class="material-icons text-sm">delete</span></button>
+            `;
+        }
+        async function saveCategoryEdit(key) {
+            const newName = document.getElementById(`edit-cat-input-${key}`).value.trim();
+            if (!newName) return showToast('Category name cannot be empty', true);
+            try {
+                await database.ref(`config/categories/${key}`).update({ name: newName });
+                showToast('Category updated!');
+            } catch (error) { showToast('Could not update category', true); }
+        }
+        async function deleteCategory(key, name) {
+            if (!confirm(`Are you sure you want to delete the category "${name}"?`)) return;
+             try {
+                const stockSnap = await database.ref('stock').orderByChild('category').equalTo(name).once('value');
+                if (stockSnap.exists()) {
+                    return showToast('Cannot delete category as it is currently in use by stock items.', true);
+                }
+                await database.ref(`config/categories/${key}`).remove();
+                showToast('Category deleted');
+            } catch (error) { showToast('Could not delete category', true); console.error(error); }
+        }
+        document.getElementById('add-category-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = document.getElementById('new-category-name');
+            const name = input.value.trim();
+            if (!name) return;
+            try {
+                await database.ref('config/categories').push({ name });
+                showToast('Category added!');
+                input.value = '';
+            } catch (error) { showToast('Could not add category', true); }
+        });
+        document.getElementById('manage-categories-btn').addEventListener('click', () => { document.getElementById('category-manager-modal').style.display = 'flex'; });
+
+        document.querySelectorAll('.close-modal-btn').forEach(btn => { btn.addEventListener('click', (e) => { e.target.closest('.modal').style.display = 'none'; if(e.target.closest('.modal').id === 'camera-modal') closeCamera(); }); });
     </script>
 </body>
 </html>
